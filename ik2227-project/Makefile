@@ -37,7 +37,7 @@ help:
 
 # ── lab control ──────────────────────────────────────────────────────────────
 start:
-	$(KATHARA) lstart -d $(LAB_DIR)
+	$(KATHARA) lstart --noterminals -d $(LAB_DIR)
 
 stop:
 	$(KATHARA) lclean -d $(LAB_DIR)

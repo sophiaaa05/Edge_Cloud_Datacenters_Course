@@ -3,7 +3,7 @@ TESTS    := $(LAB_DIR)/tests
 KATHARA  := python3 -m kathara
 
 .PHONY: help start stop restart test test-net test-k8s test-llm k8s-status connect-% logs-% \
-        shells shells-leaves shells-spines shells-all
+        shells shells-leaves shells-spines shells-all bgp-summary evpn-vni
 
 # ── default ──────────────────────────────────────────────────────────────────
 help:
@@ -58,15 +58,10 @@ test-net:
 	@$(MAKE) bgp-summary
 	@$(MAKE) evpn-vni
 
-# Run only the Kubernetes health sections (tests 4–5)
+# Run only the Kubernetes health sections (tests 4–5) + client_basic checks
 test-k8s:
-	@echo "=== Cluster A (controller1) ==="
-	docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) kubectl get nodes
-	docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) kubectl get pods -A
-	@echo ""
-	@echo "=== Cluster B (controller2) ==="
-	docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) kubectl get nodes
-	docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) kubectl get pods -A
+	@chmod +x $(TESTS)/test_k8s.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS)/test_k8s.sh
 
 # Detailed system resource check – matches the project guideline checklist
 k8s-status:

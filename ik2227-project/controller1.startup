@@ -37,3 +37,10 @@ while [[ $? != 0 ]]; do sleep 1; kubectl wait -n ingress-nginx --for condition=r
 
 # Apply the persistent volume
 kubectl apply -f /k8s/pv.yaml
+
+# Deploy LLM microservice (Cluster A)
+kubectl apply -f /shared/clustera/ns.yaml
+kubectl apply -f /shared/clustera/pvc.yaml
+kubectl apply -f /shared/clustera/deploy_llm.yaml
+kubectl apply -f /shared/clustera/svc.yaml
+kubectl apply -f /shared/clustera/ing.yaml

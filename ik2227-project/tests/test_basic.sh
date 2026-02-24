@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Basic project test suite.
-# All checks run inside Kathará containers via 'kathara exec'.
-# Run from the lab directory or set LAB_DIR.
+
 
 set -uo pipefail
 
@@ -170,8 +169,8 @@ section "LLM Microservice endpoints (from client_basic)"
 QUERY='{"query": "An orc wanted to destroy everything"}'
 
 for CLUSTER_HOST_EXPECT in \
-    "clustera.com|once upon a time" \
-    "clusterb.com|long ago"
+    "clustera.com|Once upon a time," \
+    "clusterb.com|Long ago, in a faraway land"
 do
     HOST="${CLUSTER_HOST_EXPECT%%|*}"; EXPECT="${CLUSTER_HOST_EXPECT#*|}"
     echo "  Calling $HOST/completion ..."

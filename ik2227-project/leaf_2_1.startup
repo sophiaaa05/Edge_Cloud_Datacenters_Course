@@ -16,7 +16,7 @@ ip link set dev eth2 master br100
 
 # Enable bridge VLANs
 ip link set dev br100 type bridge vlan_filtering 1
-bridge vlan add vid 800 dev vtep9000 pvid untagged
+bridge vlan add vid 800 dev vtep8000 pvid untagged
 bridge vlan add vid 800 dev eth2
 
 

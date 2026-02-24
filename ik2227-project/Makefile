@@ -1,0 +1,146 @@
+LAB_DIR  := $(shell pwd)
+TESTS    := $(LAB_DIR)/tests
+KATHARA  := python3 -m kathara
+
+.PHONY: help start stop restart test test-net test-k8s test-llm k8s-status connect-% logs-% \
+        shells shells-leaves shells-spines shells-all
+
+# ── default ──────────────────────────────────────────────────────────────────
+help:
+	@echo ""
+	@echo "  IK2227 Final Project – Makefile"
+	@echo ""
+	@echo "  Lab control:"
+	@echo "    make start          – start the Kathará lab"
+	@echo "    make stop           – stop and clean the lab"
+	@echo "    make restart        – stop then start"
+	@echo ""
+	@echo "  Testing (Basic):"
+	@echo "    make test           – run all basic tests"
+	@echo "    make test-net       – BGP + VTEP reachability only"
+	@echo "    make test-k8s       – Kubernetes cluster health only"
+	@echo "    make test-llm       – LLM endpoint curl tests only"
+	@echo "    make k8s-status     – detailed nodes + pods for both clusters"
+	@echo ""
+	@echo "  Debugging:"
+	@echo "    make connect-<dev>  – open shell in a device (e.g. make connect-leaf_1_1)"
+	@echo "    make logs-<dev>     – tail FRR log for a device"
+	@echo "    make bgp-summary    – show BGP summary on all leaves"
+	@echo "    make evpn-vni       – show EVPN VNIs on all leaves"
+	@echo ""
+	@echo "  Multi-terminal (one window per device):"
+	@echo "    make shells-leaves  – open shells on all 4 leaves"
+	@echo "    make shells-spines  – open shells on all 4 spines"
+	@echo "    make shells-all     – open shells on all routing nodes"
+	@echo "    make shells DEVS=\"leaf_1_1 spine_2_1\"  – open specific devices"
+	@echo ""
+
+# ── lab control ──────────────────────────────────────────────────────────────
+start:
+	$(KATHARA) lstart -d $(LAB_DIR)
+
+stop:
+	$(KATHARA) lclean -d $(LAB_DIR)
+
+restart: stop start
+
+# ── test targets ─────────────────────────────────────────────────────────────
+test:
+	@chmod +x $(TESTS)/test_basic.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS)/test_basic.sh
+
+# Run only the BGP + VTEP sections (tests 1–3)
+test-net:
+	@chmod +x $(TESTS)/test_basic.sh
+	@LAB_DIR=$(LAB_DIR) TESTS_ONLY=net $(TESTS)/test_basic.sh 2>/dev/null || true
+	@echo "Hint: 'make test' runs the full suite; test-net shows BGP/EVPN/ping output."
+	@echo ""
+	@$(MAKE) bgp-summary
+	@$(MAKE) evpn-vni
+
+# Run only the Kubernetes health sections (tests 4–5)
+test-k8s:
+	@echo "=== Cluster A (controller1) ==="
+	docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) kubectl get nodes
+	docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) kubectl get pods -A
+	@echo ""
+	@echo "=== Cluster B (controller2) ==="
+	docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) kubectl get nodes
+	docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) kubectl get pods -A
+
+# Detailed system resource check – matches the project guideline checklist
+k8s-status:
+	@for ctrl in controller1 controller2; do \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "  $$ctrl"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		cname=$$(docker ps --filter name=$$ctrl --format '{{.Names}}' | head -1); \
+		echo ""; \
+		echo "-- Nodes --"; \
+		docker exec $$cname kubectl get nodes -o wide 2>/dev/null || echo "  (not ready)"; \
+		echo ""; \
+		echo "-- System pods (kube-system) --"; \
+		docker exec $$cname kubectl get pods -n kube-system 2>/dev/null || echo "  (not ready)"; \
+		echo ""; \
+		echo "-- llm-ns --"; \
+		docker exec $$cname kubectl get all -n llm-ns 2>/dev/null || echo "  (namespace not found)"; \
+	done
+
+# Run only the LLM curl tests (test 6)
+test-llm:
+	@echo "=== Cluster A: onceupon ==="
+	docker exec $$(docker ps --filter name=client_basic --format '{{.Names}}' | head -1) \
+		curl -s -X POST -H "Content-Type: application/json" \
+		-d '{"query": "An orc wanted to destroy everything"}' \
+		http://clustera.com/completion | python3 -m json.tool || true
+	@echo ""
+	@echo "=== Cluster B: faraway ==="
+	docker exec $$(docker ps --filter name=client_basic --format '{{.Names}}' | head -1) \
+		curl -s -X POST -H "Content-Type: application/json" \
+		-d '{"query": "An orc wanted to destroy everything"}' \
+		http://clusterb.com/completion | python3 -m json.tool || true
+
+# ── multi-terminal helpers ────────────────────────────────────────────────────
+# Opens one alacritty window per device. Install tmux for a better split layout.
+DEVS ?=
+
+shells:
+	@if [ -z "$(DEVS)" ]; then echo "Usage: make shells DEVS=\"leaf_1_1 spine_2_1\""; exit 1; fi
+	@for dev in $(DEVS); do \
+		cname=$$(docker ps --filter name=$$dev --format '{{.Names}}' | head -1); \
+		if [ -z "$$cname" ]; then echo "WARNING: $$dev not running, skipping"; continue; fi; \
+		alacritty --title "$$dev" -e bash -c "docker exec -it $$cname bash; exec bash" & \
+	done
+
+shells-leaves:
+	@$(MAKE) shells DEVS="leaf_1_1 leaf_1_2 leaf_2_1 leaf_2_2"
+
+shells-spines:
+	@$(MAKE) shells DEVS="spine_1_1 spine_1_2 spine_2_1 spine_2_2"
+
+shells-all:
+	@$(MAKE) shells DEVS="leaf_1_1 leaf_1_2 leaf_2_1 leaf_2_2 spine_1_1 spine_1_2 spine_2_1 spine_2_2 core_1_1 core_1_2"
+
+# ── debugging helpers ─────────────────────────────────────────────────────────
+connect-%:
+	docker exec -it $$(docker ps --filter name=$* --format '{{.Names}}' | head -1) bash
+
+logs-%:
+	docker exec $$(docker ps --filter name=$* --format '{{.Names}}' | head -1) journalctl -u frr -f
+
+bgp-summary:
+	@for dev in leaf_1_1 leaf_1_2 leaf_2_1 leaf_2_2; do \
+		echo ""; \
+		echo "=== $$dev BGP summary ==="; \
+		docker exec $$(docker ps --filter name=$$dev --format '{{.Names}}' | head -1) \
+			vtysh -c "show bgp summary" 2>/dev/null || true; \
+	done
+
+evpn-vni:
+	@for dev in leaf_1_1 leaf_1_2 leaf_2_1 leaf_2_2; do \
+		echo ""; \
+		echo "=== $$dev EVPN VNIs ==="; \
+		docker exec $$(docker ps --filter name=$$dev --format '{{.Names}}' | head -1) \
+			vtysh -c "show evpn vni" 2>/dev/null || true; \
+	done

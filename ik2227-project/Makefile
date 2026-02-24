@@ -1,6 +1,6 @@
 LAB_DIR  := $(shell pwd)
 TESTS    := $(LAB_DIR)/tests
-KATHARA  := python3 -m kathara
+KATHARA  := kathara
 
 .PHONY: help start stop restart test test-net test-k8s test-llm k8s-status connect-% logs-% \
         shells shells-leaves shells-spines shells-all bgp-summary evpn-vni

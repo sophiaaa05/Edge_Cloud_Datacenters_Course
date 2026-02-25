@@ -67,7 +67,7 @@ section "EVPN / VXLAN (VNI advertisement)"
 
 # leaf_1_1: controller1 (Cluster A/8000) + worker21 (Cluster B/9000) → both VNIs
 for vni in 8000 9000; do
-    if kexec leaf_1_1 "vtysh -c 'show evpn vni' | grep -q $vni" &>/dev/null; then
+    if kexec leaf_1_1 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "$vni"; then
         pass "leaf_1_1: VNI $vni present"
     else
         fail "leaf_1_1: VNI $vni missing"
@@ -75,24 +75,24 @@ for vni in 8000 9000; do
 done
 
 # leaf_1_2: controller2 (Cluster B/9000) only
-if kexec leaf_1_2 "vtysh -c 'show evpn vni' | grep -q 9000" &>/dev/null; then
+if kexec leaf_1_2 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "9000"; then
     pass "leaf_1_2: VNI 9000 present"
 else
     fail "leaf_1_2: VNI 9000 missing"
 fi
-if kexec leaf_1_2 "vtysh -c 'show evpn vni' | grep -q 8000" &>/dev/null; then
+if kexec leaf_1_2 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "8000"; then
     fail "leaf_1_2: VNI 8000 should NOT be present (only Cluster B here)"
 else
     pass "leaf_1_2: VNI 8000 correctly absent"
 fi
 
 # leaf_2_1: worker11 (Cluster A/8000) only
-if kexec leaf_2_1 "vtysh -c 'show evpn vni' | grep -q 8000" &>/dev/null; then
+if kexec leaf_2_1 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "8000"; then
     pass "leaf_2_1: VNI 8000 present"
 else
     fail "leaf_2_1: VNI 8000 missing"
 fi
-if kexec leaf_2_1 "vtysh -c 'show evpn vni' | grep -q 9000" &>/dev/null; then
+if kexec leaf_2_1 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "9000"; then
     fail "leaf_2_1: VNI 9000 should NOT be present (only Cluster A here)"
 else
     pass "leaf_2_1: VNI 9000 correctly absent"
@@ -100,7 +100,7 @@ fi
 
 # leaf_2_2: exit node for internet – must carry both VNIs
 for vni in 8000 9000; do
-    if kexec leaf_2_2 "vtysh -c 'show evpn vni' | grep -q $vni" &>/dev/null; then
+    if kexec leaf_2_2 "vtysh -c 'show evpn vni'" 2>/dev/null | grep -q "$vni"; then
         pass "leaf_2_2: VNI $vni present (exit node)"
     else
         fail "leaf_2_2: VNI $vni missing (exit node)"
@@ -116,7 +116,7 @@ for SRC in leaf_1_1 leaf_2_2; do
     for DST in leaf_1_1 leaf_1_2 leaf_2_1 leaf_2_2; do
         [[ "$SRC" == "$DST" ]] && continue
         IP="${LOOPBACKS[$DST]}"
-        if kexec "$SRC" "ping -c 2 -W 2 $IP > /dev/null 2>&1" &>/dev/null; then
+        if kexec "$SRC" "ping -c 2 -W 2 $IP" 2>/dev/null | grep -q "bytes from"; then
             pass "$SRC -> $DST ($IP)"
         else
             fail "$SRC -> $DST ($IP) unreachable"
@@ -127,38 +127,72 @@ done
 # ── 4. Kubernetes Cluster A health (controller1) ─────────────────────────────
 section "Kubernetes Cluster A (controller1)"
 
-for CHECK_DESC_CMD in \
-    "nodes Ready|kubectl get nodes --no-headers | grep -qv NotReady" \
-    "no crashloop/pending pods|! kubectl get pods -A --no-headers | grep -qE 'Error|CrashLoop|Pending|Unknown'" \
-    "llm-ns namespace exists|kubectl get ns llm-ns -o name" \
-    "llm-ns pod Running|kubectl get pods -n llm-ns --no-headers | grep -q Running" \
-    "llm-ns Service port 8000|kubectl get svc -n llm-ns --no-headers | grep -q 8000"
-do
-    DESC="${CHECK_DESC_CMD%%|*}"; CMD="${CHECK_DESC_CMD#*|}"
-    if kexec controller1 "$CMD" &>/dev/null; then
-        pass "controller1: $DESC"
-    else
-        fail "controller1: $DESC"
-    fi
-done
+_nodes=$(kexec controller1 "kubectl get nodes --no-headers" 2>/dev/null)
+if [[ -n "$_nodes" ]] && ! echo "$_nodes" | grep -q "NotReady"; then
+    pass "controller1: nodes Ready"
+else
+    fail "controller1: nodes Ready"
+fi
+
+_pods=$(kexec controller1 "kubectl get pods -A --no-headers" 2>/dev/null)
+if [[ -n "$_pods" ]] && ! echo "$_pods" | grep -qE 'Error|CrashLoop|Pending|Unknown'; then
+    pass "controller1: no crashloop/pending pods"
+else
+    fail "controller1: no crashloop/pending pods"
+fi
+
+if kexec controller1 "kubectl get ns llm-ns -o name" 2>/dev/null | grep -q "llm-ns"; then
+    pass "controller1: llm-ns namespace exists"
+else
+    fail "controller1: llm-ns namespace exists"
+fi
+
+if kexec controller1 "kubectl get pods -n llm-ns --no-headers" 2>/dev/null | grep -q "Running"; then
+    pass "controller1: llm-ns pod Running"
+else
+    fail "controller1: llm-ns pod Running"
+fi
+
+if kexec controller1 "kubectl get svc -n llm-ns --no-headers" 2>/dev/null | grep -q "8000"; then
+    pass "controller1: llm-ns Service port 8000"
+else
+    fail "controller1: llm-ns Service port 8000"
+fi
 
 # ── 5. Kubernetes Cluster B health (controller2) ─────────────────────────────
 section "Kubernetes Cluster B (controller2)"
 
-for CHECK_DESC_CMD in \
-    "nodes Ready|kubectl get nodes --no-headers | grep -qv NotReady" \
-    "no crashloop/pending pods|! kubectl get pods -A --no-headers | grep -qE 'Error|CrashLoop|Pending|Unknown'" \
-    "llm-ns namespace exists|kubectl get ns llm-ns -o name" \
-    "llm-ns pod Running|kubectl get pods -n llm-ns --no-headers | grep -q Running" \
-    "llm-ns Service port 8000|kubectl get svc -n llm-ns --no-headers | grep -q 8000"
-do
-    DESC="${CHECK_DESC_CMD%%|*}"; CMD="${CHECK_DESC_CMD#*|}"
-    if kexec controller2 "$CMD" &>/dev/null; then
-        pass "controller2: $DESC"
-    else
-        fail "controller2: $DESC"
-    fi
-done
+_nodes=$(kexec controller2 "kubectl get nodes --no-headers" 2>/dev/null)
+if [[ -n "$_nodes" ]] && ! echo "$_nodes" | grep -q "NotReady"; then
+    pass "controller2: nodes Ready"
+else
+    fail "controller2: nodes Ready"
+fi
+
+_pods=$(kexec controller2 "kubectl get pods -A --no-headers" 2>/dev/null)
+if [[ -n "$_pods" ]] && ! echo "$_pods" | grep -qE 'Error|CrashLoop|Pending|Unknown'; then
+    pass "controller2: no crashloop/pending pods"
+else
+    fail "controller2: no crashloop/pending pods"
+fi
+
+if kexec controller2 "kubectl get ns llm-ns -o name" 2>/dev/null | grep -q "llm-ns"; then
+    pass "controller2: llm-ns namespace exists"
+else
+    fail "controller2: llm-ns namespace exists"
+fi
+
+if kexec controller2 "kubectl get pods -n llm-ns --no-headers" 2>/dev/null | grep -q "Running"; then
+    pass "controller2: llm-ns pod Running"
+else
+    fail "controller2: llm-ns pod Running"
+fi
+
+if kexec controller2 "kubectl get svc -n llm-ns --no-headers" 2>/dev/null | grep -q "8000"; then
+    pass "controller2: llm-ns Service port 8000"
+else
+    fail "controller2: llm-ns Service port 8000"
+fi
 
 # ── 6. Microservice endpoints from client_basic ──────────────────────────────
 section "LLM Microservice endpoints (from client_basic)"

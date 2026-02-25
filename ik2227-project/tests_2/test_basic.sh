@@ -13,12 +13,9 @@ pass()    { echo -e "  ${GREEN}PASS${NC}  $1"; ((PASS++)); }
 fail()    { echo -e "  ${RED}FAIL${NC}  $1"; ((FAIL++)); ERRORS+=("$1"); }
 section() { echo -e "\n${YELLOW}━━ $1 ━━${NC}"; }
 
-# Execute a command string inside a Kathará device via docker exec
+# Execute a command string inside a Kathará device via kathara exec
 kexec() {
-    local cname
-    cname=$(docker ps --filter "name=$1" --format '{{.Names}}' | head -1)
-    [[ -z "$cname" ]] && return 1
-    docker exec "$cname" bash -c "$2" 2>/dev/null
+    kathara exec "$1" "$2" 2>/dev/null
 }
 
 # ── 1. BGP ECMP multipath verification ───────────────────────────────────────

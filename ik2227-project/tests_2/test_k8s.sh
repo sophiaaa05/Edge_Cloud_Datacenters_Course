@@ -1,15 +1,11 @@
 #!/bin/bash
 # K8s cluster health + client_basic network check.
-# Uses docker exec (kathara exec is unavailable due to pyuv).
 
 set -uo pipefail
 
-# Execute a command inside a Kathará device via docker exec.
+# Execute a command inside a Kathará device via kathara exec.
 kexec() {
-    local cname
-    cname=$(docker ps --filter "name=$1" --format '{{.Names}}' | head -1)
-    [[ -z "$cname" ]] && return 1
-    docker exec "$cname" bash -c "$2" 2>/dev/null
+    kathara exec "$1" "$2" 2>/dev/null
 }
 
 FAIL=0
@@ -21,16 +17,8 @@ for CTRL in controller1 controller2; do
     echo
     echo "--- $CTRL ---"
 
-    # Check container is running
-    CNAME=$(docker ps --filter "name=$CTRL" --format '{{.Names}}' | head -1)
-    if [[ -z "$CNAME" ]]; then
-        echo "  ❌ Container not running (check: docker ps -a | grep $CTRL)"
-        FAIL=1
-        continue
-    fi
-
     # ── Nodes ──
-    NODES=$(docker exec "$CNAME" kubectl get nodes --no-headers 2>&1)
+    NODES=$(kexec "$CTRL" "kubectl get nodes --no-headers")
     if [[ -z "$NODES" ]]; then
         echo "  ❌ kubectl not responding yet (k3s still initializing?)"
         FAIL=1
@@ -44,7 +32,7 @@ for CTRL in controller1 controller2; do
     fi
 
     # ── Pods ──
-    PODS=$(docker exec "$CNAME" kubectl get pods -A --no-headers 2>&1)
+    PODS=$(kexec "$CTRL" "kubectl get pods -A --no-headers")
     if [[ -z "$PODS" ]]; then
         echo "  ❌ Could not list pods"
         FAIL=1

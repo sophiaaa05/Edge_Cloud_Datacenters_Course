@@ -1,8 +1,9 @@
 LAB_DIR  := $(shell pwd)
 TESTS    := $(LAB_DIR)/tests
+TESTS2   := $(LAB_DIR)/tests_2
 KATHARA  := kathara
 
-.PHONY: help start stop restart test test-net test-k8s test-llm k8s-status connect-% logs-% \
+.PHONY: help start stop restart test test-net test-k8s test-llm k8s-status test-scripts test-scripts2 connect-% logs-% \
         shells shells-leaves shells-spines shells-all bgp-summary evpn-vni
 
 # ── default ──────────────────────────────────────────────────────────────────
@@ -16,11 +17,15 @@ help:
 	@echo "    make restart        – stop then start"
 	@echo ""
 	@echo "  Testing (Basic):"
-	@echo "    make test           – run all basic tests"
+	@echo "    make test           – run all basic tests (tests_2/test_basic.sh)"
 	@echo "    make test-net       – BGP + VTEP reachability only"
 	@echo "    make test-k8s       – Kubernetes cluster health only"
 	@echo "    make test-llm       – LLM endpoint curl tests only"
 	@echo "    make k8s-status     – detailed nodes + pods for both clusters"
+	@echo ""
+	@echo "  Testing (Individual scripts):"
+	@echo "    make test-scripts   – run all .sh scripts in tests/"
+	@echo "    make test-scripts2  – run both suites in tests_2/"
 	@echo ""
 	@echo "  Debugging:"
 	@echo "    make connect-<dev>  – open shell in a device (e.g. make connect-leaf_1_1)"
@@ -46,13 +51,13 @@ restart: stop start
 
 # ── test targets ─────────────────────────────────────────────────────────────
 test:
-	@chmod +x $(TESTS)/test_basic.sh
-	@LAB_DIR=$(LAB_DIR) $(TESTS)/test_basic.sh
+	@chmod +x $(TESTS2)/test_basic.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS2)/test_basic.sh
 
 # Run only the BGP + VTEP sections (tests 1–3)
 test-net:
-	@chmod +x $(TESTS)/test_basic.sh
-	@LAB_DIR=$(LAB_DIR) TESTS_ONLY=net $(TESTS)/test_basic.sh 2>/dev/null || true
+	@chmod +x $(TESTS2)/test_basic.sh
+	@LAB_DIR=$(LAB_DIR) TESTS_ONLY=net $(TESTS2)/test_basic.sh 2>/dev/null || true
 	@echo "Hint: 'make test' runs the full suite; test-net shows BGP/EVPN/ping output."
 	@echo ""
 	@$(MAKE) bgp-summary
@@ -60,8 +65,27 @@ test-net:
 
 # Run only the Kubernetes health sections (tests 4–5) + client_basic checks
 test-k8s:
-	@chmod +x $(TESTS)/test_k8s.sh
-	@LAB_DIR=$(LAB_DIR) $(TESTS)/test_k8s.sh
+	@chmod +x $(TESTS2)/test_k8s.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS2)/test_k8s.sh
+
+# Run all individual .sh scripts in tests/
+test-scripts:
+	@echo "=== Running all scripts in tests/ ==="
+	@for f in $(TESTS)/*.sh; do \
+		echo ""; \
+		echo "--- $$f ---"; \
+		chmod +x $$f && LAB_DIR=$(LAB_DIR) $$f || true; \
+	done
+
+# Run test suites from tests_2/
+test-scripts2:
+	@echo "=== Running test_basic.sh (tests_2/) ==="
+	@chmod +x $(TESTS2)/test_basic.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS2)/test_basic.sh || true
+	@echo ""
+	@echo "=== Running test_k8s.sh (tests_2/) ==="
+	@chmod +x $(TESTS2)/test_k8s.sh
+	@LAB_DIR=$(LAB_DIR) $(TESTS2)/test_k8s.sh || true
 
 # Detailed system resource check – matches the project guideline checklist
 k8s-status:

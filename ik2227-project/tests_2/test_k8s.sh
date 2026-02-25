@@ -18,9 +18,9 @@ for CTRL in controller1 controller2; do
     echo "--- $CTRL ---"
 
     # ── Nodes ──
-    NODES=$(kexec "$CTRL" "kubectl get nodes --no-headers")
-    if [[ -z "$NODES" ]]; then
-        echo "  ❌ kubectl not responding yet (k3s still initializing?)"
+    NODES=$(kexec "$CTRL" "kubectl get nodes --no-headers" 2>/dev/null)
+    if [[ -z "$NODES" ]] || echo "$NODES" | grep -qi "critical\|not running\|error"; then
+        echo "  ❌ kubectl not responding (k3s initializing or container not running)"
         FAIL=1
     elif echo "$NODES" | awk '{print $2}' | grep -wq "NotReady"; then
         echo "  ❌ Not all nodes are Ready"
@@ -32,9 +32,9 @@ for CTRL in controller1 controller2; do
     fi
 
     # ── Pods ──
-    PODS=$(kexec "$CTRL" "kubectl get pods -A --no-headers")
-    if [[ -z "$PODS" ]]; then
-        echo "  ❌ Could not list pods"
+    PODS=$(kexec "$CTRL" "kubectl get pods -A --no-headers" 2>/dev/null)
+    if [[ -z "$PODS" ]] || echo "$PODS" | grep -qi "critical\|not running\|error"; then
+        echo "  ❌ Could not list pods (container not running?)"
         FAIL=1
     else
         BAD=$(echo "$PODS" | awk '$4 !~ /^(Running|Completed|Succeeded)$/ {print}')
@@ -53,25 +53,25 @@ echo
 echo "--- client_basic ---"
 
 # eth0 IP: 10.1.1.2/30
-if kexec client_basic "ip addr show eth0 | grep -q '10.1.1.2/30'"; then
+if kexec client_basic "ip addr show eth0" 2>/dev/null | grep -q '10.1.1.2/30'; then
     echo "  ✅ eth0 has 10.1.1.2/30"
 else
     echo "  ❌ eth0 missing 10.1.1.2/30"
-    echo "     current: $(kexec client_basic 'ip addr show eth0' | grep 'inet ' || echo '(none)')"
+    echo "     current: $(kexec client_basic 'ip addr show eth0' 2>/dev/null | grep 'inet ' || echo '(none)')"
     FAIL=1
 fi
 
 # Default gateway via 10.1.1.1 (as1r1)
-if kexec client_basic "ip route show default | grep -q '10.1.1.1'"; then
+if kexec client_basic "ip route show default" 2>/dev/null | grep -q '10.1.1.1'; then
     echo "  ✅ Default gateway via 10.1.1.1 (as1r1)"
 else
     echo "  ❌ Default gateway not via 10.1.1.1"
-    echo "     current: $(kexec client_basic 'ip route show default' || echo '(none)')"
+    echo "     current: $(kexec client_basic 'ip route show default' 2>/dev/null || echo '(none)')"
     FAIL=1
 fi
 
 # /etc/hosts: clustera.com → 10.0.200.1
-if kexec client_basic "grep -q 'clustera.com' /etc/hosts"; then
+if kexec client_basic "cat /etc/hosts" 2>/dev/null | grep -q 'clustera.com'; then
     echo "  ✅ /etc/hosts has clustera.com"
 else
     echo "  ❌ /etc/hosts missing clustera.com entry"
@@ -79,7 +79,7 @@ else
 fi
 
 # /etc/hosts: clusterb.com → 10.0.100.1
-if kexec client_basic "grep -q 'clusterb.com' /etc/hosts"; then
+if kexec client_basic "cat /etc/hosts" 2>/dev/null | grep -q 'clusterb.com'; then
     echo "  ✅ /etc/hosts has clusterb.com"
 else
     echo "  ❌ /etc/hosts missing clusterb.com entry"

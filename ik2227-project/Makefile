@@ -2,6 +2,7 @@ LAB_DIR  := $(shell pwd)
 TESTS    := $(LAB_DIR)/tests
 TESTS2   := $(LAB_DIR)/tests_2
 KATHARA  := kathara
+TERMINAL ?= xterm
 
 .PHONY: help start stop restart test test-net test-k8s test-llm k8s-status test-scripts test-scripts2 connect-% logs-% \
         shells shells-leaves shells-spines shells-all bgp-summary evpn-vni
@@ -129,7 +130,7 @@ shells:
 	@for dev in $(DEVS); do \
 		cname=$$(docker ps --filter name=$$dev --format '{{.Names}}' | head -1); \
 		if [ -z "$$cname" ]; then echo "WARNING: $$dev not running, skipping"; continue; fi; \
-		alacritty --title "$$dev" -e bash -c "docker exec -it $$cname bash; exec bash" & \
+		$(TERMINAL) -title "$$dev" -e bash -c "docker exec -it $$cname bash; exec bash" & \
 	done
 
 shells-leaves:

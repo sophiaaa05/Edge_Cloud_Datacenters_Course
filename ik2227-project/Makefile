@@ -43,7 +43,7 @@ help:
 
 # ── lab control ──────────────────────────────────────────────────────────────
 start:
-	sudo $(KATHARA) lstart --noterminals -d $(LAB_DIR)
+	sudo $(KATHARA) lstart --noterminals --privileged -d $(LAB_DIR)
 
 stop:
 	$(KATHARA) lclean -d $(LAB_DIR)

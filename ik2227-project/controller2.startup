@@ -37,3 +37,10 @@ while [[ $? != 0 ]]; do sleep 1; kubectl wait -n ingress-nginx --for condition=r
 
 # Apply the persistent volume
 kubectl apply -f /k8s/pv.yaml
+
+# Deploy LLM application (namespace, storage, deployment, service, ingress)
+kubectl apply -f /k8s/ns.yaml
+kubectl apply -f /k8s/pvc.yaml
+kubectl apply -f /k8s/deploy_llm.yaml
+kubectl apply -f /k8s/svc.yaml
+kubectl apply -f /k8s/ing.yaml

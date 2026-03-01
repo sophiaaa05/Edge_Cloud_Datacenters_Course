@@ -4,7 +4,7 @@ TESTS2   := $(LAB_DIR)/tests_2
 KATHARA  := kathara
 TERMINAL ?= xterm
 
-.PHONY: help start stop restart test test-net test-k8s test-llm test-advanced k8s-status test-scripts test-scripts2 connect-% logs-% \
+.PHONY: help start stop restart test test-net test-k8s test-llm test-advanced rdma-on rdma-off k8s-status test-scripts test-scripts2 connect-% logs-% \
         shells shells-leaves shells-spines shells-all bgp-summary evpn-vni
 
 # ── default ──────────────────────────────────────────────────────────────────
@@ -23,6 +23,8 @@ help:
 	@echo "    make test-k8s       – Kubernetes cluster health only"
 	@echo "    make test-llm       – LLM endpoint curl tests only"
 	@echo "    make test-advanced  – RDMA + client_int reachability tests"
+	@echo "    make rdma-on        – switch both clusters to RDMA deployment"
+	@echo "    make rdma-off       – switch both clusters back to basic deployment"
 	@echo "    make k8s-status     – detailed nodes + pods for both clusters"
 	@echo ""
 	@echo "  Testing (Individual scripts):"
@@ -59,6 +61,22 @@ test:
 test-advanced:
 	@chmod +x $(TESTS2)/test_advanced.sh
 	@LAB_DIR=$(LAB_DIR) $(TESTS2)/test_advanced.sh
+
+rdma-on:
+	@echo "=== Switching to RDMA deployment ==="
+	@docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) \
+		sh -c 'kubectl delete -f /shared/clustera/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm_rdma.yaml'
+	@docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) \
+		sh -c 'kubectl delete -f /shared/clusterb/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm_rdma.yaml'
+	@echo "Done. Watch pods: make k8s-status"
+
+rdma-off:
+	@echo "=== Switching to basic deployment ==="
+	@docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) \
+		sh -c 'kubectl delete -f /shared/clustera/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm.yaml'
+	@docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) \
+		sh -c 'kubectl delete -f /shared/clusterb/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm.yaml'
+	@echo "Done. Watch pods: make k8s-status"
 
 # Run only the BGP + VTEP sections (tests 1–3)
 test-net:

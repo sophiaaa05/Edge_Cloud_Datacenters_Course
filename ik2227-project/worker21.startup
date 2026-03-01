@@ -1,5 +1,6 @@
 # Configure IP address
 ip address add 1.0.0.3/24 dev eth0
+ip address add 3.0.0.3/24 dev eth1
 # K8s will run in VXLAN, reduce the MTU of 50B
 ip link set dev eth0 mtu 1450
 
@@ -9,3 +10,4 @@ ip route add default via 1.0.0.1 dev eth0
 # Install the RDMA package on the fly
 apk add --no-cache iproute2 iproute2-rdma
 while [[ $? != 0 ]]; do sleep 1; apk add --no-cache -U iproute2 iproute2-rdma; done
+rdma link add rxe0 type rxe netdev eth1

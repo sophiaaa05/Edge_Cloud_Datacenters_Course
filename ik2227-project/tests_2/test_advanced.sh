@@ -144,7 +144,12 @@ fi
 section "RDMA connection logs"
 
 if [[ -n "$POD_A" ]]; then
-    LOGS_A=$(kexec controller1 "kubectl logs -n llm-ns $POD_A" 2>/dev/null)
+    LOGS_A=""
+    for _attempt in 1 2 3; do
+        LOGS_A=$(kexec controller1 "kubectl logs -n llm-ns $POD_A" 2>/dev/null)
+        [[ -n "$LOGS_A" ]] && break
+        sleep 5
+    done
     if echo "$LOGS_A" | grep -q "weights received successfully"; then
         pass "Cluster A pod: RDMA weights received successfully"
     else
@@ -158,7 +163,12 @@ if [[ -n "$POD_A" ]]; then
 fi
 
 if [[ -n "$POD_B" ]]; then
-    LOGS_B=$(kexec controller2 "kubectl logs -n llm-ns $POD_B" 2>/dev/null)
+    LOGS_B=""
+    for _attempt in 1 2 3; do
+        LOGS_B=$(kexec controller2 "kubectl logs -n llm-ns $POD_B" 2>/dev/null)
+        [[ -n "$LOGS_B" ]] && break
+        sleep 5
+    done
     if echo "$LOGS_B" | grep -q "weights received successfully"; then
         pass "Cluster B pod: RDMA weights received successfully"
     else

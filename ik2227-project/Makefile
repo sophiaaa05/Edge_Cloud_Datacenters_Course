@@ -68,7 +68,9 @@ rdma-on:
 		sh -c 'kubectl delete -f /shared/clustera/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm_rdma.yaml'
 	@docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) \
 		sh -c 'kubectl delete -f /shared/clusterb/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm_rdma.yaml'
-	@echo "Done. Watch pods: make k8s-status"
+	@echo "Waiting 90s for RDMA weight transfer to complete (60 MB SoftRoCE)..."
+	@sleep 90
+	@echo "Done. Run: make test-advanced"
 
 rdma-off:
 	@echo "=== Switching to basic deployment ==="

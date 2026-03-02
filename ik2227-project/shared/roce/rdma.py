@@ -12,7 +12,6 @@ import time
 from pyverbs.device import rdma_get_devices
 from pyverbs.enums import *
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', stream=sys.stderr)
 
 PORT = 12345
 BUFFER_SIZE = 60816028
@@ -37,7 +36,7 @@ def poll_cq(cq: pyverbs.cq.CQ, mr: pyverbs.mr.MR) -> None:
         wc_num, wc_list = cq.poll(num_entries=1)
         if wc_num > 0:
             for wc in wc_list:
-                logging.info(f"CQE: wr_id={wc.wr_id}, status={wc.status}")
+                _log.info(f"CQE: wr_id={wc.wr_id}, status={wc.status}")
                 if wc.wr_id == 0xdead:
                     if callback is not None:
                         callback(mr.read(length=BUFFER_SIZE, offset=0))
@@ -76,15 +75,15 @@ def read_weights(iface: str) -> None:
     # TCP socket to exchange QP connection parameters with the server
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((server_ip, PORT))
-    logging.info(f"RDMA Client: TCP connected to {server_ip}:{PORT}")
+    _log.info(f"RDMA Client: TCP connected to {server_ip}:{PORT}")
 
     # Open RDMA device context, register local memory
-    ctx = pyverbs.device.Context(name=iface)
-    pd = pyverbs.pd.PD(ctx)
+    context = pyverbs.device.Context(name=iface)
+    pd = pyverbs.pd.PD(context)
     mr = pyverbs.mr.MR(pd, BUFFER_SIZE, IBV_ACCESS_LOCAL_WRITE)
 
     # Create Completion Queue and Queue Pair
-    cq = pyverbs.cq.CQ(ctx, 10, None, None, 0)
+    cq = pyverbs.cq.CQ(context, 10, None, None, 0)
     qp_init_attr = pyverbs.qp.QPInitAttr(
         qp_type=IBV_QPT_RC,
         scq=cq,
@@ -98,21 +97,21 @@ def read_weights(iface: str) -> None:
     )
     qp = pyverbs.qp.QP(pd, qp_init_attr)
 
-    # Move QP to INIT state (no remote info needed yet)
+    # Move QP to INIT state 
     init_attr = pyverbs.qp.QPAttr(qp_state=IBV_QPS_INIT, port_num=1)
     init_attr.pkey_index = 0
     init_attr.qp_access_flags = 0
     qp.modify(init_attr, IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS)
 
-    # Exchange QP connection data with the server over TCP.
-    # The server sends first (see server.py), so we receive first.
+    # Exchange QP  data with the server.
+    # The server sends first (server.py).
     remote_data = recvn(sock, ctypes.sizeof(QpConnectionData))
     if len(remote_data) != ctypes.sizeof(QpConnectionData):
         raise Exception("RDMA Client: failed to receive connection info from server")
     remote_con = QpConnectionData.from_buffer_copy(remote_data)
 
     # Build and send our local connection info to the server
-    local_gid = ctx.query_gid(port_num=1, index=1)
+    local_gid = context.query_gid(port_num=1, index=1)
     byte_gid = ipaddress.ip_address(local_gid.gid).packed
     local_con_obj = QpConnectionData()
     local_con_obj.qp_num = qp.qp_num
@@ -141,7 +140,7 @@ def read_weights(iface: str) -> None:
     rts_attr.max_rd_atomic = 1
     qp.modify(rts_attr, IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC)
 
-    logging.info("RDMA Client: QP connection established, starting CQ polling thread")
+    _log.info("RDMA Client: QP connection established, starting CQ polling thread")
 
     # Start the CQ polling thread — it will call callback() when WR 0xdead completes
     global keep_polling
@@ -154,13 +153,13 @@ def read_weights(iface: str) -> None:
     read_wr = pyverbs.wr.SendWR(wr_id=0xdead, sg=[sge], num_sge=1, opcode=IBV_WR_RDMA_READ)
     read_wr.set_wr_rdma(rkey=remote_con.rkey, addr=remote_con.addr)
     qp.post_send(read_wr)
-    logging.info("RDMA Client: RDMA READ posted, waiting for completion...")
+    _log.info("RDMA Client: RDMA READ posted, waiting for completion...")
 
     # Wait for the READ to complete (poll_cq will stop the thread when WR 0xdead finishes)
     cq_thread.join()
-    logging.info("RDMA Client: weights received successfully")
+    _log.info("RDMA Client: weights received successfully")
 
-    # Signal the server that we are done, then close
+    # finnaly done 
     sock.send(b'\x00')
     sock.close()
 

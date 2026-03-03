@@ -12,6 +12,7 @@ import time
 from pyverbs.device import rdma_get_devices
 from pyverbs.enums import *
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', stream=sys.stderr)
 
 PORT = 12345
 BUFFER_SIZE = 60816028

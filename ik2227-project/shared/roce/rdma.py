@@ -36,7 +36,7 @@ def poll_cq(cq: pyverbs.cq.CQ, mr: pyverbs.mr.MR) -> None:
         wc_num, wc_list = cq.poll(num_entries=1)
         if wc_num > 0:
             for wc in wc_list:
-                _log.info(f"CQE: wr_id={wc.wr_id}, status={wc.status}")
+                logging.info(f"CQE: wr_id={wc.wr_id}, status={wc.status}")
                 if wc.wr_id == 0xdead:
                     if callback is not None:
                         callback(mr.read(length=BUFFER_SIZE, offset=0))
@@ -75,7 +75,7 @@ def read_weights(iface: str) -> None:
     # TCP socket to exchange QP connection parameters with the server
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((server_ip, PORT))
-    _log.info(f"RDMA Client: TCP connected to {server_ip}:{PORT}")
+    logging.info(f"RDMA Client: TCP connected to {server_ip}:{PORT}")
 
     # Open RDMA device context, register local memory
     context = pyverbs.device.Context(name=iface)
@@ -140,7 +140,7 @@ def read_weights(iface: str) -> None:
     rts_attr.max_rd_atomic = 1
     qp.modify(rts_attr, IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC)
 
-    _log.info("RDMA Client: QP connection established, starting CQ polling thread")
+    logging.info("RDMA Client: QP connection established, starting CQ polling thread")
 
     # Start the CQ polling thread — it will call callback() when WR 0xdead completes
     global keep_polling
@@ -153,11 +153,11 @@ def read_weights(iface: str) -> None:
     read_wr = pyverbs.wr.SendWR(wr_id=0xdead, sg=[sge], num_sge=1, opcode=IBV_WR_RDMA_READ)
     read_wr.set_wr_rdma(rkey=remote_con.rkey, addr=remote_con.addr)
     qp.post_send(read_wr)
-    _log.info("RDMA Client: RDMA READ posted, waiting for completion...")
+    logging.info("RDMA Client: RDMA READ posted, waiting for completion...")
 
     # Wait for the READ to complete (poll_cq will stop the thread when WR 0xdead finishes)
     cq_thread.join()
-    _log.info("RDMA Client: weights received successfully")
+    logging.info("RDMA Client: weights received successfully")
 
     # finnaly done 
     sock.send(b'\x00')

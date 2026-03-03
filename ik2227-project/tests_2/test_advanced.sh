@@ -89,14 +89,14 @@ fi
 # ── 5. Pods scheduled on RDMA-enabled workers ─────────────────────────────────
 section "Pod placement (nodeSelector: supports=rdma)"
 
-POD_NODE_A=$(kexec controller1 "kubectl get pods -n llm-ns -o wide --no-headers" | awk '{print $7}')
+POD_NODE_A=$(kexec controller1 "kubectl get pods -n llm-ns -o jsonpath='{.items[0].spec.nodeName}'")
 if [[ "$POD_NODE_A" == "worker11" ]]; then
     pass "controller1: llm pod running on worker11 (RDMA node)"
 else
     fail "controller1: llm pod not on worker11 (got: $POD_NODE_A)"
 fi
 
-POD_NODE_B=$(kexec controller2 "kubectl get pods -n llm-ns -o wide --no-headers" | awk '{print $7}')
+POD_NODE_B=$(kexec controller2 "kubectl get pods -n llm-ns -o jsonpath='{.items[0].spec.nodeName}'")
 if [[ "$POD_NODE_B" == "worker21" ]]; then
     pass "controller2: llm pod running on worker21 (RDMA node)"
 else

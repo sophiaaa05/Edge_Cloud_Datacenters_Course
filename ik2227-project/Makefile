@@ -65,9 +65,9 @@ test-advanced:
 rdma-on:
 	@echo "=== Switching to RDMA deployment ==="
 	@docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) \
-		sh -c 'kubectl delete -f /shared/clustera/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm_rdma.yaml'
+		sh -c 'kubectl apply -f /shared/clustera/ns.yaml && kubectl apply -f /shared/clustera/pvc.yaml && kubectl delete -f /shared/clustera/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm_rdma.yaml && kubectl apply -f /shared/clustera/svc.yaml && kubectl apply -f /shared/clustera/ing.yaml'
 	@docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) \
-		sh -c 'kubectl delete -f /shared/clusterb/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm_rdma.yaml'
+		sh -c 'kubectl apply -f /shared/clusterb/ns.yaml && kubectl apply -f /shared/clusterb/pvc.yaml && kubectl delete -f /shared/clusterb/deploy_llm.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm_rdma.yaml && kubectl apply -f /shared/clusterb/svc.yaml && kubectl apply -f /shared/clusterb/ing.yaml'
 	@echo "Waiting 180s for RDMA transfer + model init (60 MB SoftRoCE)..."
 	@sleep 180
 	@echo "Done. Run: make test-advanced"
@@ -75,9 +75,9 @@ rdma-on:
 rdma-off:
 	@echo "=== Switching to basic deployment ==="
 	@docker exec $$(docker ps --filter name=controller1 --format '{{.Names}}' | head -1) \
-		sh -c 'kubectl delete -f /shared/clustera/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm.yaml'
+		sh -c 'kubectl apply -f /shared/clustera/ns.yaml && kubectl apply -f /shared/clustera/pvc.yaml && kubectl delete -f /shared/clustera/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clustera/deploy_llm.yaml && kubectl apply -f /shared/clustera/svc.yaml && kubectl apply -f /shared/clustera/ing.yaml'
 	@docker exec $$(docker ps --filter name=controller2 --format '{{.Names}}' | head -1) \
-		sh -c 'kubectl delete -f /shared/clusterb/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm.yaml'
+		sh -c 'kubectl apply -f /shared/clusterb/ns.yaml && kubectl apply -f /shared/clusterb/pvc.yaml && kubectl delete -f /shared/clusterb/deploy_llm_rdma.yaml --ignore-not-found && kubectl apply -f /shared/clusterb/deploy_llm.yaml && kubectl apply -f /shared/clusterb/svc.yaml && kubectl apply -f /shared/clusterb/ing.yaml'
 	@echo "Done. Watch pods: make k8s-status"
 
 # Run only the BGP + VTEP sections (tests 1–3)
